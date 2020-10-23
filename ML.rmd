@@ -1,0 +1,105 @@
+---
+  title: "Practical ML"
+author: "Tanmay Ambegaokar"
+date: "21/10/2020"
+output: html_document
+---
+  
+  **Synopsis**
+  
+  Building a prediction model to know how a certain user lifts weights based on data obtained from accelerometer.
+
+The dataset consists on 5 classes:
+  
+  . The subject is lifting weights exactly according to the specification (Class A).
+
+. Throwing the elbow to the front (Class B).
+
+. Lifting the dumbbell only halfway (Class C).
+
+. Lowering the dumbbell only halfway (Class D).
+
+. Throwing the hips to the front (Class E).
+
+
+**Getting data**
+  
+  Training set - "pml-training"
+Testing set - "pml-testing"
+
+```{r}
+if(!file.exists("pml-training.csv"))
+{
+  download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", "pml-training.csv", method = 'curl')
+}
+dataset <- read.csv("pml-training.csv", na.strings = c("NA", ""))
+if(!file.exists("pml-testing.csv"))
+{
+  download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "pml-testing.csv", method = 'curl')
+}
+validation <- read.csv("pml-testing.csv")
+```
+
+**Data preprocessing**
+  
+  Import packages.
+```{r}
+library(caret)
+library(randomForest)
+```
+
+Set seed for reproducibility.
+```{r}
+set.seed(17)
+```
+
+Partitioning data. 70% - Training, 30% Testing
+```{r}
+inTrain = createDataPartition(y=dataset$classe, p=0.7, list=FALSE)
+train = dataset[inTrain,]
+test = dataset[-inTrain,]
+```
+
+Eliminate NA
+```{r}
+NACols = sapply(train, function(x) {sum(is.na(x))}) 
+NACols
+colsWithNA = names(NACols[NACols > 0]) #Column with NA values
+train = train[, !names(train) %in% colsWithNA] 
+names(train)
+train <- train[, !names(train) %in% c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window")]
+```
+
+Validation set
+```{r}
+NACols = sapply(validation, function(x) {sum(is.na(x))})
+colsWithNA = names(NACols[NACols > 0])
+validation = validation[, !names(validation) %in% colsWithNA]
+validation <- validation[, !names(validation) %in% c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window")]
+```
+
+Testing set.
+```{r}
+NACols = sapply(test, function(x) {sum(is.na(x))})
+colsWithNA = names(NACols[NACols > 0])
+test = test[, !names(test) %in% colsWithNA]
+test <- test[, !names(test) %in% c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window")]
+```
+
+Prediction model using Random Forest.
+
+```{r acc}
+model <- randomForest(classe ~ .,   data=train, ntree = 50)
+predictions <- predict(model, test)
+confusionMatrix(predictions, test$classe)
+modelAcc <- confusionMatrix(predictions, test$classe)$overall[[1]]
+```
+
+Model is `r modelAcc` accurate.
+
+Now, we will predict the unknown classes of the validation set.
+
+```{r}
+predictions <- predict(model, validation)
+predictions
+```
